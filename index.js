@@ -48,6 +48,22 @@ async function run() {
       const result = await apllicationsCollection.insertOne(application);
       res.send(result);
     });
+
+    app.get("/applications", async (req, res) => {
+      const email = req.query.email;
+      const query = { applicant: email };
+      const result = await apllicationsCollection.find(query).toArray();
+
+      for (const application of result) {
+        const jobId = application.jobId;
+        const jobQuery = { _id: new ObjectId(jobId) };
+        const job = await jobsCollection.findOne(jobQuery);
+        application.company = job.company;
+        application.company_logo = job.company_logo;
+        application.title = job.title;
+      }
+      res.send(result);
+    });
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
