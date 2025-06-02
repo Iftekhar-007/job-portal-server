@@ -28,6 +28,7 @@ async function run() {
     // db name creating
     const database = client.db("job-portal");
     const jobsCollection = database.collection("jobs");
+    const apllicationsCollection = database.collection("applications");
 
     app.get("/jobs", async (req, res) => {
       const jobData = jobsCollection.find();
@@ -39,6 +40,12 @@ async function run() {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await jobsCollection.findOne(query);
+      res.send(result);
+    });
+
+    app.post(`/applications`, async (req, res) => {
+      const application = req.body;
+      const result = await apllicationsCollection.insertOne(application);
       res.send(result);
     });
     // Send a ping to confirm a successful connection
