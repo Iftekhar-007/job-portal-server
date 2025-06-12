@@ -25,7 +25,18 @@ const logger = (req, res, next) => {
 const verifyToken = (req, res, next) => {
   const token = req?.cookies?.token;
   console.log("inside token", token);
-  next();
+
+  if (!token) {
+    return res.status(401).send({ message: "unauthorized entry" });
+  }
+
+  jwt.verify(token, process.env.JWT_ACCESS_TOKEN, (err, decoded) => {
+    if (err) {
+      return res.status(401).send({ message: "unauthorized entry" });
+    }
+    req.decoded = decoded;
+    next();
+  });
 };
 
 // console.log(process.env);
@@ -53,6 +64,7 @@ async function run() {
 
     app.post("/jwt", async (req, res) => {
       const userData = req.body;
+      // console.log(userData);
       const token = jwt.sign(userData, process.env.JWT_ACCESS_TOKEN, {
         expiresIn: "1d",
       });
@@ -66,8 +78,15 @@ async function run() {
       res.send({ success: true });
     });
 
+    app.post("/jobs", async (req, res) => {
+      const job = req.body;
+      const result = await jobsCollection.insertOne(job);
+      res.send(result);
+    });
+
     app.get("/jobs", async (req, res) => {
       const email = req.query.email;
+
       const query = {};
       if (email) {
         query.hr_email = email;
@@ -85,12 +104,6 @@ async function run() {
       res.send(result);
     });
 
-    app.post("/jobs", async (req, res) => {
-      const job = req.body;
-      const result = await jobsCollection.insertOne(job);
-      res.send(result);
-    });
-
     app.post(`/applications`, async (req, res) => {
       const application = req.body;
       const result = await apllicationsCollection.insertOne(application);
@@ -101,8 +114,9 @@ async function run() {
     app.get("/applications", logger, verifyToken, async (req, res) => {
       const email = req.query.email;
 
-      const token = req.cookies;
-      console.log("inside application api", token);
+      if (email !== req.decoded.email) {
+        return res.status(403).send({ message: "forbidden authorize" });
+      }
       const query = { applicant: email };
       const result = await apllicationsCollection.find(query).toArray();
 
