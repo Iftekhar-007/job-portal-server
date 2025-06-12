@@ -12,8 +12,21 @@ app.use(
     credentials: true,
   })
 );
-app.use(cookieParser());
+
 app.use(express.json());
+app.use(cookieParser());
+
+const logger = (req, res, next) => {
+  const token = req?.cookies?.token;
+  console.log("inside logger : ", token);
+  next();
+};
+
+const verifyToken = (req, res, next) => {
+  const token = req?.cookies?.token;
+  console.log("inside token", token);
+  next();
+};
 
 // console.log(process.env);
 
@@ -81,11 +94,15 @@ async function run() {
     app.post(`/applications`, async (req, res) => {
       const application = req.body;
       const result = await apllicationsCollection.insertOne(application);
+
       res.send(result);
     });
 
-    app.get("/applications", async (req, res) => {
+    app.get("/applications", logger, verifyToken, async (req, res) => {
       const email = req.query.email;
+
+      const token = req.cookies;
+      console.log("inside application api", token);
       const query = { applicant: email };
       const result = await apllicationsCollection.find(query).toArray();
 
