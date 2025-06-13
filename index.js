@@ -4,40 +4,64 @@ const cors = require("cors");
 const port = process.env.PORT || 3000;
 const jwt = require("jsonwebtoken");
 const cookieParser = require("cookie-parser");
+var admin = require("firebase-admin");
+
+var serviceAccount = require("./FBtokenAuth.json");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
+
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 require("dotenv").config();
-app.use(
-  cors({
-    origin: ["http://localhost:5173"],
-    credentials: true,
-  })
-);
+app.use(cors());
 
 app.use(express.json());
 app.use(cookieParser());
 
-const logger = (req, res, next) => {
-  const token = req?.cookies?.token;
-  console.log("inside logger : ", token);
-  next();
-};
+const verifyFbToken = async (req, res, next) => {
+  const authHeaders = req?.headers?.authorization;
 
-const verifyToken = (req, res, next) => {
-  const token = req?.cookies?.token;
-  console.log("inside token", token);
-
-  if (!token) {
-    return res.status(401).send({ message: "unauthorized entry" });
+  if (!authHeaders || !authHeaders.startsWith("Bearer ")) {
+    return res.status(401).send("!!Unauthorized");
   }
+  const token = authHeaders.split(" ")[1];
+  // console.log(token);
 
-  jwt.verify(token, process.env.JWT_ACCESS_TOKEN, (err, decoded) => {
-    if (err) {
-      return res.status(401).send({ message: "unauthorized entry" });
-    }
+  try {
+    const decoded = await admin.auth().verifyIdToken(token);
     req.decoded = decoded;
     next();
-  });
+  } catch (error) {
+    console.log("Error from Auth Token : ", error);
+    res.status(403).send({ message: "forbidden access" });
+  }
 };
+
+// const admin = require("firebase-admin");
+
+// const logger = (req, res, next) => {
+//   const token = req?.cookies?.token;
+//   console.log("inside logger : ", token);
+//   next();
+// };
+
+// const verifyToken = (req, res, next) => {
+//   const token = req?.cookies?.token;
+//   console.log("inside token", token);
+
+//   if (!token) {
+//     return res.status(401).send({ message: "unauthorized entry" });
+//   }
+
+//   jwt.verify(token, process.env.JWT_ACCESS_TOKEN, (err, decoded) => {
+//     if (err) {
+//       return res.status(401).send({ message: "unauthorized entry" });
+//     }
+//     req.decoded = decoded;
+//     next();
+//   });
+// };
 
 // console.log(process.env);
 
@@ -62,21 +86,21 @@ async function run() {
     const jobsCollection = database.collection("jobs");
     const apllicationsCollection = database.collection("applications");
 
-    app.post("/jwt", async (req, res) => {
-      const userData = req.body;
-      // console.log(userData);
-      const token = jwt.sign(userData, process.env.JWT_ACCESS_TOKEN, {
-        expiresIn: "1d",
-      });
+    // app.post("/jwt", async (req, res) => {
+    //   const userData = req.body;
+    //   // console.log(userData);
+    //   const token = jwt.sign(userData, process.env.JWT_ACCESS_TOKEN, {
+    //     expiresIn: "1d",
+    //   });
 
-      res.cookie("token", token, {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: false,
-      });
+    //   res.cookie("token", token, {
+    //     httpOnly: true,
+    //     sameSite: "lax",
+    //     secure: false,
+    //   });
 
-      res.send({ success: true });
-    });
+    //   res.send({ success: true });
+    // });
 
     app.post("/jobs", async (req, res) => {
       const job = req.body;
@@ -111,12 +135,15 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/applications", logger, verifyToken, async (req, res) => {
-      const email = req.query.email;
+    app.get("/applications", verifyFbToken, async (req, res) => {
+      const email = req?.query?.email;
 
-      if (email !== req.decoded.email) {
-        return res.status(403).send({ message: "forbidden authorize" });
+      if (email !== req?.decoded?.email) {
+        return res.status(403).send({ message: "Forbidden" });
       }
+
+      // console.log("authorization", req.headers);
+
       const query = { applicant: email };
       const result = await apllicationsCollection.find(query).toArray();
 
